@@ -14,7 +14,7 @@ module Rack
         server = server.to_s
 
         unless @handlers.include? server
-          load_error = try_require('rack/handler', server)
+          load_error = try_require(server)
         end
 
         if klass = @handlers[server]
@@ -61,22 +61,19 @@ module Rack
         end
       end
 
-      # Transforms server-name constants to their canonical form as filenames,
-      # then tries to require them but silences the LoadError if not found
-      #
-      # Naming convention:
+      # Conventions:
       #
       #   Foo # => 'foo'
-      #   FooBar # => 'foo_bar.rb'
-      #   FooBAR # => 'foobar.rb'
-      #   FOObar # => 'foobar.rb'
-      #   FOOBAR # => 'foobar.rb'
-      #   FooBarBaz # => 'foo_bar_baz.rb'
-      def try_require(prefix, const_name)
-        file = const_name.gsub(/^[A-Z]+/) { |pre| pre.downcase }.
-          gsub(/[A-Z]+[^A-Z]/, '_\&').downcase
+      #   FooBar # => 'foo_bar'
+      #   FooBarBaz # => 'foo_bar_baz'
+      def underscore(string)
+        string.gsub(/^[A-Z]+/) { |pre| pre.downcase }.gsub(/[A-Z]+[^A-Z]/, '_\&').downcase
+      end
 
-        require(::File.join(prefix, file))
+      # Transforms server-name constants to their canonical form as filenames,
+      # then tries to require them but silences the LoadError if not found
+      def try_require(const_name)
+        require ::File.join('rack/handler', underscore(const_name))
         nil
       rescue LoadError => error
         error
