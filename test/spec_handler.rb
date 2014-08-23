@@ -56,4 +56,21 @@ describe Rack::Handler do
       $LOAD_PATH.delete path
     end
   end
+
+  describe '#pick' do
+    should "raise LoadError if no handler was found" do
+      lambda {
+        Rack::Handler.pick('boom')
+      }.should.raise(LoadError)
+      lambda {
+        Rack::Handler.pick(['boom', 'not_existing'])
+      }.should.raise(LoadError)
+    end
+
+    should "select first available Rack handler given an `Array` of server names" do
+      Rack::Handler.pick(['boom', 'cgi']).should.equal Rack::Handler::CGI
+      Rack::Handler.pick(['boom', 'webrick', 'cgi']).should.equal Rack::Handler::WEBrick
+      Rack::Handler.pick(['cgi', 'boom', 'not_existing']).should.equal Rack::Handler::CGI
+    end
+  end
 end
