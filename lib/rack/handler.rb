@@ -9,15 +9,12 @@ module Rack
   # configuration.
   module Handler
     class << self
-      def get(server)
-        return unless server
-        server = server.to_s
+      def get(server_name)
+        return unless server_name
 
-        try_require_if_unregistered server
-
-        server_class = try_get_server_class server
-        raise (@load_error || @name_error) unless server_class
-        server_class
+        handler_class = get_handler_class(server_name)
+        raise (@load_error || @name_error) unless handler_class
+        handler_class
       end
 
       # Select first available Rack handler given an `Array` of server names.
@@ -28,10 +25,8 @@ module Rack
       def pick(server_names)
         server_names = Array(server_names)
         server_names.each do |server_name|
-          begin
-            return get(server_name.to_s)
-          rescue LoadError, NameError
-          end
+          handler_class = get_handler_class(server_name)
+          return handler_class if handler_class
         end
 
         raise LoadError, "Couldn't find handler for: #{server_names.join(', ')}."
@@ -54,7 +49,15 @@ module Rack
         end
       end
 
-      # Conventions:
+      # name - can be a server-name for registered handlers e.g. 'cgi',
+      # or constant_name of handler class e.g. "Rack::Handler::CGI".
+      def get_handler_class(name)
+        name = name.to_s
+        try_require_if_unregistered name
+        try_get_handler_class name
+      end
+
+      # File name from class name:
       #
       #   Foo # => 'foo'
       #   FooBar # => 'foo_bar'
@@ -63,11 +66,12 @@ module Rack
         string.gsub(/^[A-Z]+/) { |pre| pre.downcase }.gsub(/[A-Z]+[^A-Z]/, '_\&').downcase
       end
 
+      # Foo::Bar::Baz from 'Foo::Bar::Baz'
       def class_from_string(string)
         string.split("::").inject(Object) { |o, x| o.const_get(x) }
       end
 
-      # If server class is not registered yet, try to require file with name
+      # If server class is not registered yet, try to require file with the name
       # got from server-name constant transformed into canonical form filename.
       # Silences the LoadError if not found.
       def try_require_if_unregistered(const_name)
@@ -79,21 +83,26 @@ module Rack
         @load_error = error
       end
 
-      def try_get_server_class(server)
+      # Try to get handler, if registered, by server-name.
+      # Otherwise get it by name of handler class.
+      # name - can be a server-name for registered handlers e.g. 'cgi',
+      # or constant_name of handler class e.g. "Rack::Handler::CGI".
+      # returns nil, if nothing was found.
+      def try_get_handler_class(name)
         @name_error = nil
-        if server_class_name = @handlers[server]
-          class_from_string server_class_name
+        if handler_class_name = @handlers[name]
+          class_from_string handler_class_name
         else
-          const_get server
+          const_get name
         end
       rescue NameError => error
         @name_error = error
         nil
       end
 
-      def register(server, klass)
+      def register(name, klass)
         @handlers ||= {}
-        @handlers[server.to_s] = klass.to_s
+        @handlers[name.to_s] = klass.to_s
       end
     end
 
