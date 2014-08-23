@@ -13,18 +13,11 @@ module Rack
         return unless server
         server = server.to_s
 
-        unless @handlers.include? server
-          load_error = try_require(server)
-        end
+        try_require_if_unregistered server
 
-        if klass = @handlers[server]
-          klass.split("::").inject(Object) { |o, x| o.const_get(x) }
-        else
-          const_get(server)
-        end
-
-      rescue NameError => name_error
-        raise load_error || name_error
+        server_class = try_get_server_class server
+        raise (@load_error || @name_error) unless server_class
+        server_class
       end
 
       # Select first available Rack handler given an `Array` of server names.
@@ -70,13 +63,32 @@ module Rack
         string.gsub(/^[A-Z]+/) { |pre| pre.downcase }.gsub(/[A-Z]+[^A-Z]/, '_\&').downcase
       end
 
-      # Transforms server-name constants to their canonical form as filenames,
-      # then tries to require them but silences the LoadError if not found
-      def try_require(const_name)
-        require ::File.join('rack/handler', underscore(const_name))
-        nil
+      def class_from_string(string)
+        string.split("::").inject(Object) { |o, x| o.const_get(x) }
+      end
+
+      # If server class is not registered yet, try to require file with name
+      # got from server-name constant transformed into canonical form filename.
+      # Silences the LoadError if not found.
+      def try_require_if_unregistered(const_name)
+        @load_error = nil
+        unless @handlers.include?(const_name)
+          require ::File.join('rack/handler', underscore(const_name))
+        end
       rescue LoadError => error
-        error
+        @load_error = error
+      end
+
+      def try_get_server_class(server)
+        @name_error = nil
+        if server_class_name = @handlers[server]
+          class_from_string server_class_name
+        else
+          const_get server
+        end
+      rescue NameError => error
+        @name_error = error
+        nil
       end
 
       def register(server, klass)
