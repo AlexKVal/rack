@@ -49,19 +49,11 @@ describe Rack::Server::Options do
       result.should.not.match(/Port/)
     end
 
-    # it shouldn't be acting this way:
-    it "raises LoadError, for now, but it is wrong; when handler was not found" do
-      lambda {
-        Rack::Server::Options.new.handler_opts({:server => 'non_exsisting'})
-      }.should.raise LoadError
+    should "return Warning-text when handler was not found" do
+      result = Rack::Server::Options.new.handler_opts({:server => 'non_exsisting'})
+      result.should.not.equal ''
+      result.should.match(/Warning/)
     end
-
-    # it should be acting this way:
-    # should "return Warning-text when handler was not found" do
-    #   result = Rack::Server::Options.new.handler_opts({:server => 'non_exsisting'})
-    #   result.should.not.equal ''
-    #   result.should.match(/Warning/)
-    # end
   end
 
 end
