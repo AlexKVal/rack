@@ -6,7 +6,7 @@ module Rack
   class Server
 
     class Options
-      def parse!(args)
+      def self.parse!(args)
         options = {}
         opt_parser = OptionParser.new("", 24, '  ') do |opts|
           opts.banner = "Usage: rackup [ruby options] [rack options] [rackup config]"
@@ -103,7 +103,7 @@ module Rack
         options
       end
 
-      def handler_opts(options)
+      def self.handler_opts(options)
         info = []
         server = Rack::Handler.get(options[:server]) || Rack::Handler.default(options)
         if server.respond_to?(:valid_options)
@@ -316,7 +316,7 @@ module Rack
       end
 
       def opt_parser
-        Options.new
+        Options
       end
 
       def build_app(app)
