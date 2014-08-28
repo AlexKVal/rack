@@ -63,7 +63,7 @@ module Rack
     def self.handler_opts(options)
       info = []
       server = get(options[:server]) || default(options)
-      if server && server.respond_to?(:valid_options)
+      if server.respond_to?(:valid_options)
         info << ""
         info << "Server-specific options for #{server.name}:"
 
