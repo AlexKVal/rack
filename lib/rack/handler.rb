@@ -61,25 +61,23 @@ module Rack
     end
 
     def self.handler_opts(options)
-      begin
-        info = []
-        server = get(options[:server]) || default(options)
-        if server && server.respond_to?(:valid_options)
-          info << ""
-          info << "Server-specific options for #{server.name}:"
+      info = []
+      server = get(options[:server]) || default(options)
+      if server && server.respond_to?(:valid_options)
+        info << ""
+        info << "Server-specific options for #{server.name}:"
 
-          has_options = false
-          server.valid_options.each do |name, description|
-            next if name.to_s.match(/^(Host|Port)[^a-zA-Z]/) # ignore handler's host and port options, we do our own.
-            info << "  -O %-21s %s" % [name, description]
-            has_options = true
-          end
-          return "" if !has_options
+        has_options = false
+        server.valid_options.each do |name, description|
+          next if name.to_s.match(/^(Host|Port)[^a-zA-Z]/) # ignore handler's host and port options, we do our own.
+          info << "  -O %-21s %s" % [name, description]
+          has_options = true
         end
-        info.join("\n")
-      rescue NameError, LoadError
-        return "Warning: Could not find handler specified (#{options[:server] || 'default'}) to determine handler-specific options"
+        return "" if !has_options
       end
+      info.join("\n")
+    rescue NameError, LoadError
+      return "Warning: Could not find handler specified (#{options[:server] || 'default'}) to determine handler-specific options"
     end
 
     # Transforms server-name constants to their canonical form as filenames,
