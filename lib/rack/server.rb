@@ -5,105 +5,6 @@ module Rack
 
   class Server
 
-    class Options
-      def parse!(args)
-        options = {}
-        opt_parser = OptionParser.new("", 24, '  ') do |opts|
-          opts.banner = "Usage: rackup [ruby options] [rack options] [rackup config]"
-
-          opts.separator ""
-          opts.separator "Ruby options:"
-
-          lineno = 1
-          opts.on("-e", "--eval LINE", "evaluate a LINE of code") { |line|
-            eval line, TOPLEVEL_BINDING, "-e", lineno
-            lineno += 1
-          }
-
-          opts.on("-b", "--builder BUILDER_LINE", "evaluate a BUILDER_LINE of code as a builder script") { |line|
-            options[:builder] = line
-          }
-
-          opts.on("-d", "--debug", "set debugging flags (set $DEBUG to true)") {
-            options[:debug] = true
-          }
-          opts.on("-w", "--warn", "turn warnings on for your script") {
-            options[:warn] = true
-          }
-          opts.on("-q", "--quiet", "turn off logging") {
-            options[:quiet] = true
-          }
-
-          opts.on("-I", "--include PATH",
-                  "specify $LOAD_PATH (may be used more than once)") { |path|
-            (options[:include] ||= []).concat(path.split(":"))
-          }
-
-          opts.on("-r", "--require LIBRARY",
-                  "require the library, before executing your script") { |library|
-            options[:require] = library
-          }
-
-          opts.separator ""
-          opts.separator "Rack options:"
-          opts.on("-s", "--server SERVER", "serve using SERVER (thin/puma/webrick/mongrel)") { |s|
-            options[:server] = s
-          }
-
-          opts.on("-o", "--host HOST", "listen on HOST (default: 0.0.0.0)") { |host|
-            options[:Host] = host
-          }
-
-          opts.on("-p", "--port PORT", "use PORT (default: 9292)") { |port|
-            options[:Port] = port
-          }
-
-          opts.on("-O", "--option NAME[=VALUE]", "pass VALUE to the server as option NAME. If no VALUE, sets it to true. Run '#{$0} -s SERVER -h' to get a list of options for SERVER") { |name|
-            name, value = name.split('=', 2)
-            value = true if value.nil?
-            options[name.to_sym] = value
-          }
-
-          opts.on("-E", "--env ENVIRONMENT", "use ENVIRONMENT for defaults (default: development)") { |e|
-            options[:environment] = e
-          }
-
-          opts.on("-D", "--daemonize", "run daemonized in the background") { |d|
-            options[:daemonize] = d ? true : false
-          }
-
-          opts.on("-P", "--pid FILE", "file to store PID") { |f|
-            options[:pid] = ::File.expand_path(f)
-          }
-
-          opts.separator ""
-          opts.separator "Common options:"
-
-          opts.on_tail("-h", "-?", "--help", "Show this message") do
-            puts opts
-            puts Rack::Handler.handler_opts(options)
-
-            exit
-          end
-
-          opts.on_tail("--version", "Show version") do
-            puts "Rack #{Rack.version} (Release: #{Rack.release})"
-            exit
-          end
-        end
-
-        begin
-          opt_parser.parse! args
-        rescue OptionParser::InvalidOption => e
-          warn e.message
-          abort opt_parser.to_s
-        end
-
-        options[:config] = args.last if args.last
-        options
-      end
-    end
-
     # Start a new rack server (like running rackup). This will parse ARGV and
     # provide standard ARGV rackup options, defaulting to load 'config.ru'.
     #
@@ -165,7 +66,7 @@ module Rack
     end
 
     def options
-      @options ||= parse_options(ARGV)
+      @options || parse_options(ARGV)
     end
 
     def default_options
@@ -272,34 +173,117 @@ module Rack
 
     private
       def build_app_and_options_from_config
-        if !::File.exist? options[:config]
-          abort "configuration #{options[:config]} not found"
-        end
-
-        app, options = Rack::Builder.parse_file(self.options[:config], opt_parser)
-        self.options.merge! options
-        app
+        abort "configuration #{options[:config]} not found" unless ::File.exist? options[:config]
+        Rack::Builder.parse_file(options[:config], opt_parser)
       end
 
       def build_app_from_string
-        Rack::Builder.new_from_string(self.options[:builder])
+        Rack::Builder.new_from_string(options[:builder])
       end
 
       def parse_options(args)
-        options = default_options
+        @options = default_options
 
         # Don't evaluate CGI ISINDEX parameters.
         # http://www.meb.uni-bonn.de/docs/cgi/cl.html
         args.clear if ENV.include?("REQUEST_METHOD")
 
-        options.merge! opt_parser.parse!(args)
-        options[:config] = ::File.expand_path(options[:config])
-        ENV["RACK_ENV"] = options[:environment]
-        options
+        begin
+          opt_parser.parse! args
+        rescue OptionParser::InvalidOption => e
+          warn e.message
+          abort opt_parser.to_s
+        end
+
+        @options[:config] = ::File.expand_path(args.last || @options[:config])
+        ENV["RACK_ENV"] = @options[:environment]
+        @options
       end
 
       def opt_parser
-        Options.new
+        @opt_parser ||= OptionParser.new("", 24, '  ') do |opts|
+          opts.banner = "Usage: rackup [ruby options] [rack options] [rackup config]"
+
+          opts.separator ""
+          opts.separator "Ruby options:"
+
+          lineno = 1
+          opts.on("-e", "--eval LINE", "evaluate a LINE of code") { |line|
+            eval line, TOPLEVEL_BINDING, "-e", lineno
+            lineno += 1
+          }
+
+          opts.on("-b", "--builder BUILDER_LINE", "evaluate a BUILDER_LINE of code as a builder script") { |line|
+            @options[:builder] = line
+          }
+
+          opts.on("-d", "--debug", "set debugging flags (set $DEBUG to true)") {
+            @options[:debug] = true
+          }
+          opts.on("-w", "--warn", "turn warnings on for your script") {
+            @options[:warn] = true
+          }
+          opts.on("-q", "--quiet", "turn off logging") {
+            @options[:quiet] = true
+          }
+
+          opts.on("-I", "--include PATH",
+                  "specify $LOAD_PATH (may be used more than once)") { |path|
+            (@options[:include] ||= []).concat(path.split(":"))
+          }
+
+          opts.on("-r", "--require LIBRARY",
+                  "require the library, before executing your script") { |library|
+            @options[:require] = library
+          }
+
+          opts.separator ""
+          opts.separator "Rack options:"
+          opts.on("-s", "--server SERVER", "serve using SERVER (thin/puma/webrick/mongrel)") { |s|
+            @options[:server] = s
+          }
+
+          opts.on("-o", "--host HOST", "listen on HOST (default: 0.0.0.0)") { |host|
+            @options[:Host] = host
+          }
+
+          opts.on("-p", "--port PORT", "use PORT (default: 9292)") { |port|
+            @options[:Port] = port
+          }
+
+          opts.on("-O", "--option NAME[=VALUE]", "pass VALUE to the server as option NAME. If no VALUE, sets it to true. Run '#{$0} -s SERVER -h' to get a list of options for SERVER") { |name|
+            name, value = name.split('=', 2)
+            value = true if value.nil?
+            @options[name.to_sym] = value
+          }
+
+          opts.on("-E", "--env ENVIRONMENT", "use ENVIRONMENT for defaults (default: development)") { |e|
+            @options[:environment] = e
+          }
+
+          opts.on("-D", "--daemonize", "run daemonized in the background") { |d|
+            @options[:daemonize] = d ? true : false
+          }
+
+          opts.on("-P", "--pid FILE", "file to store PID") { |f|
+            @options[:pid] = ::File.expand_path(f)
+          }
+
+          opts.separator ""
+          opts.separator "Common options:"
+
+          opts.on_tail("-h", "-?", "--help", "Show this message") do
+            puts opts
+            puts Rack::Handler.handler_opts(@options)
+
+            exit
+          end
+
+          opts.on_tail("--version", "Show version") do
+            puts "Rack #{Rack.version} (Release: #{Rack.release})"
+            exit
+          end
+        end
       end
 
       def build_app(app)

@@ -18,15 +18,22 @@ class NothingMiddleware
   end
 end
 
+class MockOptParser
+  attr_reader :parse_arg
+  def parse!(arg)
+    @parse_arg = arg
+  end
+end
+
 describe Rack::Builder do
   def builder(&block)
     Rack::Lint.new Rack::Builder.new(&block)
   end
-  
+
   def builder_to_app(&block)
     Rack::Lint.new Rack::Builder.new(&block).to_app
   end
-  
+
   it "supports mapping" do
     app = builder_to_app do
       map '/' do |outer_env|
@@ -184,14 +191,15 @@ describe Rack::Builder do
       File.join(File.dirname(__FILE__), 'builder', name)
     end
 
-    it "parses commented options" do
-      app, options = Rack::Builder.parse_file config_file('options.ru')
-      options[:debug].should.be.true
+    it "conveys commented options to parser" do
+      opt_parser = MockOptParser.new
+      app = Rack::Builder.parse_file(config_file('options.ru'), opt_parser)
+      opt_parser.parse_arg.should.include '-d'
       Rack::MockRequest.new(app).get("/").body.to_s.should.equal 'OK'
     end
 
     it "removes __END__ before evaluating app" do
-      app, _ = Rack::Builder.parse_file config_file('end.ru')
+      app = Rack::Builder.parse_file config_file('end.ru')
       Rack::MockRequest.new(app).get("/").body.to_s.should.equal 'OK'
     end
 
@@ -203,13 +211,13 @@ describe Rack::Builder do
 
     it "requires anything not ending in .ru" do
       $: << File.dirname(__FILE__)
-      app, * = Rack::Builder.parse_file 'builder/anything'
+      app  = Rack::Builder.parse_file 'builder/anything'
       Rack::MockRequest.new(app).get("/").body.to_s.should.equal 'OK'
       $:.pop
     end
 
     it "sets __LINE__ correctly" do
-      app, _ = Rack::Builder.parse_file config_file('line.ru')
+      app = Rack::Builder.parse_file config_file('line.ru')
       Rack::MockRequest.new(app).get("/").body.to_s.should.equal '1'
     end
   end
